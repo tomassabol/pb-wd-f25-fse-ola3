@@ -25,7 +25,6 @@ const loginSchema = z
 
 export async function userRoutes(fastify: FastifyInstance) {
   fastify.post("/v1/auth/register", {
-    // preHandler: [fastify.verifyToken, fastify.requireAdmin],
     handler: async (request, reply) => {
       const { success, data } = createUserSchema.safeParse(request.body)
       if (!success) {

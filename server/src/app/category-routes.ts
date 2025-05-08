@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2"
-import { and, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 import { type FastifyInstance } from "fastify"
 import { z } from "zod"
 
@@ -16,14 +16,20 @@ export const categorySchema = z
 export async function categoryRoutes(fastify: FastifyInstance) {
   // Get all categories (viewer access)
   fastify.get("/v1/categories", {
-    preHandler: fastify.auth([fastify.verifyToken, fastify.requireViewer]),
+    preHandler: fastify.auth([fastify.verifyToken]),
     handler: async (request, reply) => {
       try {
         const categories = await db.query.category.findMany({
-          where: eq(categoryTable.active, true),
+          where: and(
+            eq(categoryTable.active, true),
+            eq(categoryTable.createdBy, request.user.id),
+          ),
         })
+        const [{ count: total }] = await db
+          .select({ count: count() })
+          .from(categoryTable)
 
-        return reply.status(200).send(categories)
+        return reply.status(200).send({ categories, total })
       } catch (error) {
         console.error(error)
         return reply.status(500).send({ error: "Internal server error" })
@@ -33,7 +39,7 @@ export async function categoryRoutes(fastify: FastifyInstance) {
 
   // Create category (editor access)
   fastify.post("/v1/categories", {
-    preHandler: fastify.auth([fastify.verifyToken, fastify.requireEditor]),
+    preHandler: fastify.auth([fastify.verifyToken]),
     handler: async (request, reply) => {
       const { success, data } = categorySchema.safeParse(request.body)
 
@@ -44,7 +50,11 @@ export async function categoryRoutes(fastify: FastifyInstance) {
       try {
         const [category] = await db
           .insert(categoryTable)
-          .values({ id: createId(), ...data })
+          .values({
+            id: createId(),
+            ...data,
+            createdBy: request.user.id,
+          })
           .returning()
 
         return reply.status(201).send(category)
@@ -57,7 +67,7 @@ export async function categoryRoutes(fastify: FastifyInstance) {
 
   // Get category by ID (viewer access)
   fastify.get("/v1/categories/:id", {
-    preHandler: fastify.auth([fastify.verifyToken, fastify.requireViewer]),
+    preHandler: fastify.auth([fastify.verifyToken]),
     handler: async (request, reply) => {
       const id = getId(request)
 
@@ -67,7 +77,11 @@ export async function categoryRoutes(fastify: FastifyInstance) {
 
       try {
         const category = await db.query.category.findFirst({
-          where: and(eq(categoryTable.id, id), eq(categoryTable.active, true)),
+          where: and(
+            eq(categoryTable.id, id),
+            eq(categoryTable.active, true),
+            eq(categoryTable.createdBy, request.user.id),
+          ),
         })
 
         if (!category) {
@@ -84,7 +98,7 @@ export async function categoryRoutes(fastify: FastifyInstance) {
 
   // Update category (editor access)
   fastify.put("/v1/categories/:id", {
-    preHandler: fastify.auth([fastify.verifyToken, fastify.requireEditor]),
+    preHandler: fastify.auth([fastify.verifyToken]),
     handler: async (request, reply) => {
       const id = getId(request)
 
@@ -119,7 +133,7 @@ export async function categoryRoutes(fastify: FastifyInstance) {
 
   // Delete category (editor access)
   fastify.delete("/v1/categories/:id", {
-    preHandler: [fastify.verifyToken, fastify.requireEditor],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const id = getId(request)
 

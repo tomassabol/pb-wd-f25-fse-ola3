@@ -10,11 +10,19 @@ const categoryTable = pgTable("category", {
     .$defaultFn(() => createId()),
   name: text("name").notNull(),
   active: boolean("active").notNull().default(true),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => userTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type Category = typeof categoryTable.$inferSelect
-const categoryRelations = relations(categoryTable, ({ many }) => ({
+const categoryRelations = relations(categoryTable, ({ many, one }) => ({
   entries: many(entryTable),
+  createdBy: one(userTable, {
+    fields: [categoryTable.createdBy],
+    references: [userTable.id],
+  }),
 }))
 
 const entryTable = pgTable("entry", {
@@ -27,13 +35,21 @@ const entryTable = pgTable("entry", {
     .references(() => categoryTable.id),
   description: text("description"),
   active: boolean("active").notNull().default(true),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => userTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type Entry = typeof entryTable.$inferSelect
 const entryRelations = relations(entryTable, ({ one }) => ({
   category: one(categoryTable, {
     fields: [entryTable.categoryId],
     references: [categoryTable.id],
+  }),
+  createdBy: one(userTable, {
+    fields: [entryTable.createdBy],
+    references: [userTable.id],
   }),
 }))
 
@@ -49,6 +65,7 @@ export const userTable = pgTable("user", {
     .default(Role.USER),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type User = typeof userTable.$inferSelect
 

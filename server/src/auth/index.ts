@@ -73,7 +73,6 @@ export function requireRole(role: Role) {
     if (!request.user) {
       return reply.status(401).send({ error: "Unauthorized" })
     }
-
     const userRole = request.user.role
     if (userRole !== Role.ADMIN && userRole !== role) {
       return reply.status(403).send({ error: "Insufficient permissions" })

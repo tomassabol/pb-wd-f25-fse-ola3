@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2"
-import { and, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 import { type FastifyInstance } from "fastify"
 import { z } from "zod"
 
@@ -18,7 +18,7 @@ export const entrySchema = z
 export async function entryRoutes(fastify: FastifyInstance) {
   // Get all entries (viewer access)
   fastify.get("/v1/entries", {
-    preHandler: [fastify.verifyToken, fastify.requireViewer],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const sort =
         (request.query as { sortByCategory?: string })?.sortByCategory ===
@@ -32,20 +32,43 @@ export async function entryRoutes(fastify: FastifyInstance) {
             where: and(
               eq(entryTable.categoryId, categoryId),
               eq(entryTable.active, true),
+              eq(entryTable.createdBy, request.user.id),
             ),
-            orderBy: sort ? [desc(entryTable.createdAt)] : undefined,
           })
 
-          return reply.status(200).send(entries)
+          return reply.status(200).send({ total: entries.length, entries })
         }
 
         const entries = await db.query.entry.findMany({
           with: { category: true },
-          where: eq(entryTable.active, true),
-          orderBy: sort ? [desc(entryTable.createdAt)] : undefined,
+          where: and(
+            eq(entryTable.active, true),
+            eq(entryTable.createdBy, request.user.id),
+          ),
         })
 
-        return reply.status(200).send(entries)
+        const [{ count: total }] = await db
+          .select({ count: count() })
+          .from(entryTable)
+          .where(eq(entryTable.active, true))
+
+        if (sort) {
+          const sortByCategory = entries.reduce(
+            (acc, entry) => {
+              const categoryName = entry.category?.name ?? "Uncategorized"
+              if (!acc[categoryName]) {
+                acc[categoryName] = []
+              }
+              acc[categoryName].push(entry)
+              return acc
+            },
+            {} as Record<string, typeof entries>,
+          )
+
+          return reply.status(200).send({ total, entries: sortByCategory })
+        }
+
+        return reply.status(200).send({ total, entries })
       } catch (error) {
         console.error(error)
         return reply.status(500).send({ error: "Internal server error" })
@@ -55,7 +78,7 @@ export async function entryRoutes(fastify: FastifyInstance) {
 
   // Create entry (editor access)
   fastify.post("/v1/entries", {
-    preHandler: [fastify.verifyToken, fastify.requireEditor],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const { success, data } = entrySchema.safeParse(request.body)
 
@@ -66,7 +89,11 @@ export async function entryRoutes(fastify: FastifyInstance) {
       try {
         const [entry] = await db
           .insert(entryTable)
-          .values({ id: createId(), ...data })
+          .values({
+            id: createId(),
+            ...data,
+            createdBy: request.user.id,
+          })
           .returning()
 
         return reply.status(201).send(entry)
@@ -79,7 +106,7 @@ export async function entryRoutes(fastify: FastifyInstance) {
 
   // Get entry by ID (viewer access)
   fastify.get("/v1/entries/:id", {
-    preHandler: [fastify.verifyToken, fastify.requireViewer],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const id = getId(request)
 
@@ -89,7 +116,11 @@ export async function entryRoutes(fastify: FastifyInstance) {
 
       try {
         const entry = await db.query.entry.findFirst({
-          where: and(eq(entryTable.id, id), eq(entryTable.active, true)),
+          where: and(
+            eq(entryTable.id, id),
+            eq(entryTable.active, true),
+            eq(entryTable.createdBy, request.user.id),
+          ),
           with: { category: true },
         })
 
@@ -107,7 +138,7 @@ export async function entryRoutes(fastify: FastifyInstance) {
 
   // Update entry (editor access)
   fastify.put("/v1/entries/:id", {
-    preHandler: [fastify.verifyToken, fastify.requireEditor],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const id = getId(request)
 
@@ -138,7 +169,7 @@ export async function entryRoutes(fastify: FastifyInstance) {
 
   // Delete entry (editor access)
   fastify.delete("/v1/entries/:id", {
-    preHandler: [fastify.verifyToken, fastify.requireEditor],
+    preHandler: [fastify.verifyToken],
     handler: async (request, reply) => {
       const id = getId(request)
 

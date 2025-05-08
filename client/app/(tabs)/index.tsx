@@ -1,75 +1,141 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { useEntriesByCategory } from "~/service/entry/entry-api";
 
-export default function HomeScreen() {
+export default function EntriesScreen() {
+  const router = useRouter();
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ErrorBoundary
+      fallback={
+        <SafeAreaView className="flex-1 bg-gray-50">
+          <View className="flex-1 items-center justify-center">
+            <Ionicons name="alert-circle-outline" size={56} color="#9CA3AF" />
+            <Text className="text-xl font-medium text-gray-400 mt-4">
+              Error loading entries
+            </Text>
+            <Pressable
+              className="mt-6 bg-blue-500 px-6 py-3 rounded-full"
+              onPress={() => router.back()}
+            >
+              <Text className="text-white font-semibold">Go Back</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      }
+    >
+      <Suspense
+        fallback={
+          <SafeAreaView className="flex-1 bg-gray-50">
+            <View className="flex-1 items-center justify-center">
+              <Text className="text-lg text-gray-500">Loading entries...</Text>
+            </View>
+          </SafeAreaView>
+        }
+      >
+        <EntriesView />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+function EntriesView() {
+  const router = useRouter();
+  const { data: entriesByCategory } = useEntriesByCategory();
+
+  if (Object.keys(entriesByCategory.entries).length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <ScrollView className="flex-1 px-4 py-6">
+          <View className="flex items-center justify-center h-64">
+            <Ionicons name="document-text-outline" size={56} color="#9CA3AF" />
+            <Text className="text-xl font-medium text-gray-400 mt-4">
+              No entries found
+            </Text>
+            <Text className="mt-2 text-sm text-gray-400 text-center px-8">
+              Create your first entry to get started
+            </Text>
+            <Pressable
+              className="mt-6 bg-blue-500 px-6 py-3 rounded-full"
+              onPress={() => router.navigate("/new-entry")}
+            >
+              <Text className="text-white font-semibold">Create Entry</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-gray-50 pb-24">
+      <View className="flex-1">
+        <View className="px-4 py-4 flex-row items-center justify-between bg-white border-b border-gray-200">
+          <Text className="text-2xl font-bold text-gray-800">My Entries</Text>
+          <Pressable
+            className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center"
+            onPress={() => router.navigate("/new-entry")}
+          >
+            <Ionicons name="add" size={24} color="#3B82F6" />
+          </Pressable>
+        </View>
+
+        <ScrollView className="flex-1 px-4 py-4">
+          <View className="space-y-8">
+            {Object.entries(entriesByCategory.entries).map(
+              ([category, entries]) => (
+                <View key={category} className="space-y-3">
+                  <View className="flex-row items-center">
+                    <View className="w-1 h-6 bg-blue-500 rounded-full mr-2" />
+                    <Text className="text-lg font-semibold text-gray-700">
+                      {category}
+                    </Text>
+                    <Text className="text-sm text-gray-400 ml-2">
+                      ({entries.length})
+                    </Text>
+                  </View>
+                  <View className="space-y-3 gap-2">
+                    {entries.map((entry) => (
+                      <Pressable
+                        key={entry.id}
+                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 active:bg-gray-50"
+                        onPress={() => router.navigate(`/entry/${entry.id}`)}
+                      >
+                        <View className="flex-row justify-between items-center">
+                          <View className="flex-1">
+                            <Text className="text-base font-medium text-gray-800 mb-1">
+                              {entry.name}
+                            </Text>
+                            <View className="flex-row items-center mt-1">
+                              <Ionicons
+                                name="time-outline"
+                                size={14}
+                                color="#9CA3AF"
+                              />
+                              <Text className="text-xs text-gray-400 ml-1">
+                                {new Date(entry.createdAt).toLocaleDateString()}
+                              </Text>
+                            </View>
+                          </View>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={20}
+                            color="#D1D5DB"
+                          />
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
