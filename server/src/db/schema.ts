@@ -11,6 +11,7 @@ const categoryTable = pgTable("category", {
   name: text("name").notNull(),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type Category = typeof categoryTable.$inferSelect
 const categoryRelations = relations(categoryTable, ({ many }) => ({
@@ -28,6 +29,7 @@ const entryTable = pgTable("entry", {
   description: text("description"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type Entry = typeof entryTable.$inferSelect
 const entryRelations = relations(entryTable, ({ one }) => ({
@@ -49,6 +51,7 @@ export const userTable = pgTable("user", {
     .default(Role.USER),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 type User = typeof userTable.$inferSelect
 
