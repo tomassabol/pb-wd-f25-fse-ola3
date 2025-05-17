@@ -17,11 +17,11 @@
   ],
   "components": {
     "securitySchemes": {
-      "ApiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-api-key",
-        "description": "API key for authentication. Contact support to obtain your API key."
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token for authentication. Obtain this token by logging in."
       }
     },
     "schemas": {
@@ -34,6 +34,30 @@
             "example": "Category not found"
           }
         }
+      },
+      "User": {
+        "type": "object",
+        "description": "Represents a user in the system",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the user",
+            "example": "clg1234567890"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the user",
+            "example": "user@example.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["USER", "ADMIN"],
+            "description": "Role of the user",
+            "example": "USER"
+          }
+        },
+        "required": ["id", "email", "role"]
       },
       "Category": {
         "type": "object",
@@ -53,9 +77,20 @@
             "type": "integer",
             "description": "Number of active entries in this category",
             "example": 5
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the category is active",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the category was created",
+            "example": "2024-05-04T12:00:00Z"
           }
         },
-        "required": ["id", "name"]
+        "required": ["id", "name", "active"]
       },
       "Entry": {
         "type": "object",
@@ -100,15 +135,217 @@
   },
   "security": [
     {
-      "ApiKeyAuth": []
+      "BearerAuth": []
     }
   ],
   "paths": {
+    "/v1/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "description": "Creates a new user account",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address for the new user",
+                    "example": "user@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Password for the new user (minimum 8 characters)",
+                    "example": "password123"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["USER", "ADMIN"],
+                    "description": "Role for the new user",
+                    "example": "USER"
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Login user",
+        "description": "Authenticates a user and returns a JWT token",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the user",
+                    "example": "user@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Password of the user",
+                    "example": "password123"
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "JWT token for authentication"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "summary": "Get current user",
+        "description": "Retrieves information about the currently authenticated user",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User information retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/categories": {
       "get": {
         "summary": "Get all categories",
         "description": "Retrieves a list of all categories with their entry counts",
         "tags": ["Categories"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of categories retrieved successfully",
@@ -149,6 +386,11 @@
         "summary": "Create a new category",
         "description": "Creates a new financial category",
         "tags": ["Categories"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -206,6 +448,11 @@
         "summary": "Get category by ID",
         "description": "Retrieves a specific category by its ID",
         "tags": ["Categories"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -264,6 +511,11 @@
         "summary": "Update category",
         "description": "Updates an existing category",
         "tags": ["Categories"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -334,6 +586,69 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Delete category",
+        "description": "Soft deletes a category by setting its active status to false",
+        "tags": ["Categories"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier of the category"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid category ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/entries": {
@@ -341,6 +656,11 @@
         "summary": "Get all entries",
         "description": "Retrieves a list of all active entries. Can be filtered by category and sorted by creation date.",
         "tags": ["Entries"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "categoryId",
@@ -359,7 +679,7 @@
               "type": "string",
               "enum": ["true", "false"]
             },
-            "description": "Sort entries by creation date when set to true"
+            "description": "Sort entries by category when set to true"
           }
         ],
         "responses": {
@@ -368,9 +688,32 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Entry"
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of entries",
+                      "example": 10
+                    },
+                    "entries": {
+                      "oneOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Entry"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/Entry"
+                            }
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -392,6 +735,11 @@
         "summary": "Create a new entry",
         "description": "Creates a new financial entry",
         "tags": ["Entries"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -460,6 +808,11 @@
         "summary": "Get entry by ID",
         "description": "Retrieves a specific entry by its ID",
         "tags": ["Entries"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -518,6 +871,11 @@
         "summary": "Update entry",
         "description": "Updates an existing entry",
         "tags": ["Entries"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -604,6 +962,11 @@
         "summary": "Delete entry",
         "description": "Soft deletes an entry by setting its active status to false",
         "tags": ["Entries"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
